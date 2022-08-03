@@ -591,6 +591,8 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	struct station *station;
 	u8 *dest = hdr->addr1;
 	u8 *src = frame->sender->addr;
+	sock = socket_to_global;
+	char message[1000];
 
 	if (frame->flags & HWSIM_TX_STAT_ACK) {
 		/* rx the frame on the dest interface */
@@ -634,29 +636,34 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					continue;
 				}
 
-				send_cloned_frame_msg(ctx, station,
+				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, signal,
-						      frame->freq);
+						      frame->freq);*/
 			} else if (memcmp(dest, station->addr, ETH_ALEN) == 0) {
 				if (set_interference_duration(ctx,
 					frame->sender->index, frame->duration,
 					frame->signal))
 					continue;
 				rate_idx = frame->tx_rates[0].idx;
-				send_cloned_frame_msg(ctx, station,
+				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, frame->signal,
-						      frame->freq);
+						      frame->freq);*/
   			}
 		}
 	} else
 		set_interference_duration(ctx, frame->sender->index,
 					  frame->duration, frame->signal);
 
-	send_tx_info_frame_nl(ctx, frame);
+	/*send_tx_info_frame_nl(ctx, frame);*/
+	
+	//...wrap frame...
+	
+	//Send the message back to client
+	write(sock , message, strlen(message));
 
 	free(frame);
 }
@@ -747,97 +754,47 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
  * Handle events from the kernel.  Process CMD_FRAME events and queue them
  * for later delivery with the scheduler.
  */
-static int process_messages_cb(struct nl_msg *msg, void *arg)
+static int process_messages_cb(u8 *hwaddr, unsigned int data_len, unsigned int flags, unsigned int tx_rates_len, u64 cookie, u32 freq, void *arg, u8 *src, struct hwsim_tx_rate *tx_rates)
 {
 	struct wmediumd *ctx = arg;
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
-	/* netlink header */
-	struct nlmsghdr *nlh = nlmsg_hdr(msg);
-	/* generic netlink header*/
-	struct genlmsghdr *gnlh = nlmsg_data(nlh);
-
 	struct station *sender;
 	struct frame *frame;
-	struct ieee80211_hdr *hdr;
-	u8 *src;
 	sock_w = socket_to_global;
 	char message[1000] , server_reply[2000];
 
-	if (gnlh->cmd == HWSIM_CMD_FRAME) {
-		
-		pthread_rwlock_rdlock(&snr_lock);
-		/* we get the attributes*/
-		genlmsg_parse(nlh, 0, attrs, HWSIM_ATTR_MAX, NULL);
-		if (attrs[HWSIM_ATTR_ADDR_TRANSMITTER]) {
-			u8 *hwaddr = (u8 *)nla_data(attrs[HWSIM_ATTR_ADDR_TRANSMITTER]); //mac address of tx sta // TO SEND
 
-			unsigned int data_len =
-				nla_len(attrs[HWSIM_ATTR_FRAME]); //TO SEND------------------------------------
-			char *data = (char *)nla_data(attrs[HWSIM_ATTR_FRAME]); //data array
-			unsigned int flags =
-				nla_get_u32(attrs[HWSIM_ATTR_FLAGS]); //TO SEND--------------------------------
-			unsigned int tx_rates_len =
-				nla_len(attrs[HWSIM_ATTR_TX_INFO]); //TO SEND----------------------------------
-			struct hwsim_tx_rate *tx_rates =
-				(struct hwsim_tx_rate *)
-				nla_data(attrs[HWSIM_ATTR_TX_INFO]);
-			u64 cookie = nla_get_u64(attrs[HWSIM_ATTR_COOKIE]); //TO SEND--------------------------
-			u32 freq; //TO SEND--------------------------------------------------------------------
-			freq = attrs[HWSIM_ATTR_FREQ] ?
-					nla_get_u32(attrs[HWSIM_ATTR_FREQ]) : 2412; //TO SEND------------------
+	pthread_rwlock_rdlock(&snr_lock);
 
-			hdr = (struct ieee80211_hdr *)data; //SEND DEFERENCED DATA-----------------------------
-			src = hdr->addr2; //here goes the sender address
+	if (data_len < 6 + 6 + 4)
+		goto out;
 
-			if (data_len < 6 + 6 + 4)
-				goto out;
-
-			sender = get_station_by_addr(ctx, src);
-			if (!sender) {
-				w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
-				goto out;
-			}
-			memcpy(sender->hwaddr, hwaddr, ETH_ALEN);
-
-			frame = malloc(sizeof(*frame) + data_len);
-			if (!frame)
-				goto out;
-
-			memcpy(frame->data, data, data_len);
-			frame->data_len = data_len;
-			frame->flags = flags;
-			frame->cookie = cookie;
-			frame->freq = freq;
-			frame->sender = sender;
-			sender->freq = freq;
-			frame->tx_rates_count =
-				tx_rates_len / sizeof(struct hwsim_tx_rate);
-			memcpy(frame->tx_rates, tx_rates,
-			       min(tx_rates_len, sizeof(frame->tx_rates)));
-			//queue_frame(ctx, sender, frame);
-			
-			//Send data to global wmediumd
-			if( send(sock_w , message , strlen(message) , 0) < 0)
-			{
-				puts("Send failed");
-				return 1;
-			}
-
-			//Receive a reply from the server
-			if( recv(sock_w , server_reply , 2000 , 0) < 0)
-			{
-				puts("recv failed");
-				break;
-			}
-
-			puts("Server reply :");
-			puts(server_reply);
-		}
-out:
-		pthread_rwlock_unlock(&snr_lock);
-		return 0;
-
+	sender = get_station_by_addr(ctx, src);
+	if (!sender) {
+		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
+		goto out;
 	}
+	memcpy(sender->hwaddr, hwaddr, ETH_ALEN);
+
+	frame = malloc(sizeof(*frame) + data_len);
+	if (!frame)
+		goto out;
+
+	memcpy(frame->data, data, data_len);
+	frame->data_len = data_len;
+	frame->flags = flags;
+	frame->cookie = cookie;
+	frame->freq = freq;
+	frame->sender = sender;
+	sender->freq = freq;
+	frame->tx_rates_count =
+		tx_rates_len / sizeof(struct hwsim_tx_rate);
+	memcpy(frame->tx_rates, tx_rates,
+	       min(tx_rates_len, sizeof(frame->tx_rates)));
+	queue_frame(ctx, sender, frame);
+
+	pthread_rwlock_unlock(&snr_lock);
+		
 	return 0;
 }
 
@@ -973,10 +930,9 @@ void *connection_handler(void *socket_desc)
 	//Receive a message from client
 	while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 )
 	{
-		//add data rx andpass to function and modify function
-		process_messages_cb(...)
-		//Send the message back to client
-		write(sock , client_message , strlen(client_message));
+		//...extrapolating data...
+		
+		process_messages_cb(hwaddr, data_len, flags, tx_rates_len, cookie, freq, arg, src, tx_rates)
 	}
 	
 	if(read_size == 0)
