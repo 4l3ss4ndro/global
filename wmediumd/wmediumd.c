@@ -50,6 +50,19 @@
 
 int socket_to_global = 0;
 
+typedef struct{
+		u64 cookie_tosend;
+		u32 freq_tosend;
+		int flags_tosend;
+		int signal_tosend;
+		int duration_tosend;
+		int tx_rates_count_tosend;
+		//add sender
+		size_t data_len_tosend;
+		u8 data_tosend[0];
+	} mystruct_torecv;
+mystruct_torecv client_message;
+
 static inline int div_round(int a, int b)
 {
 	return (a + b - 1) / b;
