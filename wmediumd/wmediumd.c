@@ -54,12 +54,12 @@ typedef struct{
 		u64 cookie_tosend;
 		u32 freq_tosend;
 		int flags_tosend;
-		int signal_tosend;
-		int duration_tosend;
 		int tx_rates_count_tosend;
-		//add sender
+		struct hwsim_tx_rate tx_rates_tosend[IEEE80211_TX_MAX_RATES];
 		size_t data_len_tosend;
 		u8 data_tosend[0];
+		u8 hwaddr_tosend[ETH_ALEN];
+		u8 src_tosend;
 	} mystruct_torecv;
 mystruct_torecv client_message;
 
@@ -774,36 +774,31 @@ static int process_messages_cb(mystruct_torecv client_message)
 	struct station *sender;
 	struct frame *frame;
 	sock_w = socket_to_global;
-	char message[1000] , server_reply[2000];
-
 
 	pthread_rwlock_rdlock(&snr_lock);
 
-	if (data_len < 6 + 6 + 4)
+	if (client_message->data_len_tosend < 6 + 6 + 4)
 		goto out;
 
-	sender = get_station_by_addr(ctx, src);
+	sender = get_station_by_addr(ctx, client_message->src_tosend);
 	if (!sender) {
 		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
 		goto out;
 	}
-	memcpy(sender->hwaddr, hwaddr, ETH_ALEN);
+	memcpy(sender->hwaddr, client_message->hwaddr_tosend, ETH_ALEN);
 
-	frame = malloc(sizeof(*frame) + data_len);
+	frame = malloc(sizeof(*frame) + client_message->data_len_tosend);
 	if (!frame)
 		goto out;
 
-	memcpy(frame->data, data, data_len);
-	frame->data_len = data_len;
-	frame->flags = flags;
-	frame->cookie = cookie;
-	frame->freq = freq;
+	memcpy(frame->data, client_message->data_tosend, client_message->data_len_tosend);
+	frame->data_len = client_message->data_len_tosend;
+	frame->flags = client_message->flags_tosend;
+	frame->cookie = client_message->cookie_tosend;
+	frame->freq = client_message->freq_tosend;
 	frame->sender = sender;
-	sender->freq = freq;
-	frame->tx_rates_count =
-		tx_rates_len / sizeof(struct hwsim_tx_rate);
-	memcpy(frame->tx_rates, tx_rates,
-	       min(tx_rates_len, sizeof(frame->tx_rates)));
+	frame->tx_rates_count = client_message->tx_rates_count_tosend;
+	memcpy(frame->tx_rates, client_message->tx_rates_tosend, sizeof(client_message->tx_rates_tosend));
 	queue_frame(ctx, sender, frame);
 
 	pthread_rwlock_unlock(&snr_lock);
