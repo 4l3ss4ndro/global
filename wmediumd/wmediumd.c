@@ -754,7 +754,7 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
  * Handle events from the kernel.  Process CMD_FRAME events and queue them
  * for later delivery with the scheduler.
  */
-static int process_messages_cb(u8 *hwaddr, unsigned int data_len, unsigned int flags, unsigned int tx_rates_len, u64 cookie, u32 freq, void *arg, u8 *src, struct hwsim_tx_rate *tx_rates)
+static int process_messages_cb(mystruct_torecv client_message)
 {
 	struct wmediumd *ctx = arg;
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
@@ -920,19 +920,16 @@ static void timer_cb(int fd, short what, void *data)
 	pthread_rwlock_unlock(&snr_lock);
 }
 
-void *connection_handler(void *socket_desc)
+void *connection_handler(void *socket_desc, mystruct_torecv client_message)
 {
 	//Get the socket descriptor
 	int sock = *(int*)socket_desc;
 	int read_size;
-	char *message , client_message[2000];
 	
 	//Receive a message from client
-	while( (read_size = recv(sock , client_message , 2000 , 0)) > 0 )
+	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 )
 	{
-		//...extrapolating data...
-		
-		process_messages_cb(hwaddr, data_len, flags, tx_rates_len, cookie, freq, arg, src, tx_rates)
+		process_messages_cb(client_message)
 	}
 	
 	if(read_size == 0)
