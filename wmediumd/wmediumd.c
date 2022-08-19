@@ -605,7 +605,19 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	u8 *dest = hdr->addr1;
 	u8 *src = frame->sender->addr;
 	sock = socket_to_global;
-	char message[1000];
+	typedef struct{
+		u64 cookie_tosend;
+		u32 freq_tosend;
+		int flags_tosend;
+		int tx_rates_count_tosend;
+		struct hwsim_tx_rate tx_rates_tosend[IEEE80211_TX_MAX_RATES];
+		size_t data_len_tosend;
+		u8 data_tosend[0];
+		int rate_idx_tosend;
+		int signal_tosend;
+		int fsignal_tosend;
+	} mystruct_tosend;
+	mystruct_tosend server_reply;
 
 	if (frame->flags & HWSIM_TX_STAT_ACK) {
 		/* rx the frame on the dest interface */
@@ -613,7 +625,6 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 			if (memcmp(src, station->addr, ETH_ALEN) == 0)
 				continue;
 
-			int rate_idx;
 			if (is_multicast_ether_addr(dest)) {
 				int snr, signal;
 				double error_prob;
@@ -673,10 +684,19 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 
 	/*send_tx_info_frame_nl(ctx, frame);*/
 	
-	//...wrap frame...
+	memcpy(server_reply->data_tosend, data, data_len);
+	server_reply->data_len_tosend = frame->data_len;
+	server_reply->flags_tosend = frame->flags;
+	server_reply->cookie_tosend = frame->cookie;
+	server_reply->freq_tosend = frame->freq;
+	server_reply->rate_idx_tosend = rate_idx;
+	server_reply->signal_tosend = signal;
+	server_reply->fsignal_tosend = frame->signal;
+	server_reply->tx_rates_count_tosend = frame->tx_rates_count_tosend;
+	memcpy(server_reply->tx_rates_tosend, frame->tx_rates, sizeof(server_reply->tx_rates_tosend));
 	
 	//Send the message back to client
-	write(sock , message, strlen(message));
+	write(sock, (char*)&server_reply, sizeof(mystruct_tosend));
 
 	free(frame);
 }
@@ -767,7 +787,7 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
  * Handle events from the kernel.  Process CMD_FRAME events and queue them
  * for later delivery with the scheduler.
  */
-static int process_messages_cb(mystruct_torecv client_message)
+static int process_messages_cb(void *arg)
 {
 	struct wmediumd *ctx = arg;
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
@@ -928,7 +948,7 @@ static void timer_cb(int fd, short what, void *data)
 	pthread_rwlock_unlock(&snr_lock);
 }
 
-void *connection_handler(void *socket_desc, mystruct_torecv client_message)
+void *connection_handler(void *socket_desc)
 {
 	//Get the socket descriptor
 	int sock = *(int*)socket_desc;
@@ -937,7 +957,7 @@ void *connection_handler(void *socket_desc, mystruct_torecv client_message)
 	//Receive a message from client
 	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 )
 	{
-		process_messages_cb(client_message)
+		process_messages_cb();
 	}
 	
 	if(read_size == 0)
