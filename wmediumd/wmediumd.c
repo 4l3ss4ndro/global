@@ -660,22 +660,23 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					continue;
 				}
 
-				/*send_cloned_frame_msg(ctx, station,
+				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, signal,
-						      frame->freq);*/
+						      frame->freq);
 			} else if (memcmp(dest, station->addr, ETH_ALEN) == 0) {
 				if (set_interference_duration(ctx,
 					frame->sender->index, frame->duration,
 					frame->signal))
 					continue;
 				rate_idx = frame->tx_rates[0].idx;
-				/*send_cloned_frame_msg(ctx, station,
+
+				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, frame->signal,
-						      frame->freq);*/
+						      frame->freq);
   			}
 		}
 	} else
