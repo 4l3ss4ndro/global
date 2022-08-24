@@ -813,9 +813,9 @@ static int process_messages_cb(void *arg)
 	memcpy(sender->hwaddr, client_message.hwaddr_tosend, ETH_ALEN);
 
 	frame = malloc(sizeof(*frame) + client_message.data_len_tosend);
-	//if (!frame){
-	//	goto out;
-	//}
+	if (!frame){
+		goto out;
+	}
 	
 	memcpy(frame->data, client_message.data_tosend, client_message.data_len_tosend);
 	frame->data_len = client_message.data_len_tosend;
@@ -827,7 +827,9 @@ static int process_messages_cb(void *arg)
 	memcpy(frame->tx_rates, client_message.tx_rates_tosend, sizeof(client_message.tx_rates_tosend));
 	queue_frame(ctx, sender, frame);
 
+out:
 	pthread_rwlock_unlock(&snr_lock);
+	
 		
 	return 0;
 }
