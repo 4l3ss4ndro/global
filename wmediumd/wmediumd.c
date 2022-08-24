@@ -670,7 +670,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					frame->sender->index, frame->duration,
 					frame->signal))
 					continue;
-				rate_idx = frame->tx_rates[0].idx;
+				int rate_idx = frame->tx_rates[0].idx;
 
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
@@ -795,15 +795,16 @@ static int process_messages_cb(void *arg)
 	struct station *sender;
 	struct frame *frame;
 	int sock_w = socket_to_global;
+	u8 *src = client_message.src_tosend;
 
 	pthread_rwlock_rdlock(&snr_lock);
 
 	if (client_message.data_len_tosend < 6 + 6 + 4)
 		goto out;
 
-	sender = get_station_by_addr(ctx, client_message.src_tosend);
+	sender = get_station_by_addr(ctx, src);
 	if (!sender) {
-		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(client_message.src_tosend));
+		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
 		goto out;
 	}
 	memcpy(sender->hwaddr, client_message.hwaddr_tosend, ETH_ALEN);
