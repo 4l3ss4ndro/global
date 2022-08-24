@@ -626,7 +626,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				continue;
 
 			if (is_multicast_ether_addr(dest)) {
-				int snr, signal;
+				int snr, signal, rate_idx;
 				double error_prob;
 				/*
 				 * we may or may not receive this based on
@@ -647,7 +647,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 
 				snr -= get_signal_offset_by_interference(ctx,
 					frame->sender->index, station->index);
-				int rate_idx = frame->tx_rates[0].idx;
+				rate_idx = frame->tx_rates[0].idx;
 				error_prob = ctx->get_error_prob(ctx,
 					(double)snr, rate_idx, frame->freq,
 					frame->data_len, frame->sender,
@@ -670,7 +670,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					frame->sender->index, frame->duration,
 					frame->signal))
 					continue;
-				int rate_idx = frame->tx_rates[0].idx;
+				rate_idx = frame->tx_rates[0].idx;
 
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
