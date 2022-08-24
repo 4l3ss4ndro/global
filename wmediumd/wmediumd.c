@@ -49,6 +49,7 @@
 #include<pthread.h> //for threading , link with lpthread
 
 int socket_to_global = 0;
+struct wmediumd *ctx_to_pass;
 
 typedef struct{
 		u64 cookie_tosend;
@@ -618,6 +619,8 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 		int fsignal_tosend;
 	} mystruct_tosend;
 	mystruct_tosend server_reply;
+	
+	int rate_idx;
 
 	if (frame->flags & HWSIM_TX_STAT_ACK) {
 		/* rx the frame on the dest interface */
@@ -626,7 +629,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				continue;
 
 			if (is_multicast_ether_addr(dest)) {
-				int snr, signal, rate_idx;
+				int snr, signal;
 				double error_prob;
 				/*
 				 * we may or may not receive this based on
@@ -810,9 +813,9 @@ static int process_messages_cb(void *arg)
 	memcpy(sender->hwaddr, client_message.hwaddr_tosend, ETH_ALEN);
 
 	frame = malloc(sizeof(*frame) + client_message.data_len_tosend);
-	if (!frame){
-		goto out;
-	}
+	//if (!frame){
+	//	goto out;
+	//}
 	
 	memcpy(frame->data, client_message.data_tosend, client_message.data_len_tosend);
 	frame->data_len = client_message.data_len_tosend;
@@ -951,11 +954,12 @@ static void timer_cb(int fd, short what, void *data)
 	pthread_rwlock_unlock(&snr_lock);
 }
 
-void *connection_handler(void *socket_desc, struct wmediumd *ctx)
+void *connection_handler(void *socket_desc)
 {
 	//Get the socket descriptor
 	int sock = *(int*)socket_desc;
 	int read_size;
+	struct wmediumd *ctx = ctx_to_pass;
 	
 	//Receive a message from client
 	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 ))
@@ -1150,7 +1154,7 @@ int main(int argc, char *argv[])
 		new_sock = malloc(1);
 		*new_sock = client_sock;
 		
-		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock, &ctx) < 0)
+		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock) < 0)
 		{
 			perror("could not create thread");
 			return 1;
