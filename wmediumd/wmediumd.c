@@ -810,9 +810,10 @@ static int process_messages_cb(void *arg)
 	memcpy(sender->hwaddr, client_message.hwaddr_tosend, ETH_ALEN);
 
 	frame = malloc(sizeof(*frame) + client_message.data_len_tosend);
-	if (!frame)
+	if (!frame){
 		goto out;
-
+	}
+	
 	memcpy(frame->data, client_message.data_tosend, client_message.data_len_tosend);
 	frame->data_len = client_message.data_len_tosend;
 	frame->flags = client_message.flags_tosend;
@@ -950,7 +951,7 @@ static void timer_cb(int fd, short what, void *data)
 	pthread_rwlock_unlock(&snr_lock);
 }
 
-void *connection_handler(void *socket_desc)
+void *connection_handler(void *socket_desc, struct wmediumd *ctx)
 {
 	//Get the socket descriptor
 	int sock = *(int*)socket_desc;
@@ -959,7 +960,7 @@ void *connection_handler(void *socket_desc)
 	//Receive a message from client
 	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 ))
 	{
-		process_messages_cb();
+		process_messages_cb(ctx);
 	}
 	
 	if(read_size == 0)
@@ -1149,7 +1150,7 @@ int main(int argc, char *argv[])
 		new_sock = malloc(1);
 		*new_sock = client_sock;
 		
-		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock) < 0)
+		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock, &ctx) < 0)
 		{
 			perror("could not create thread");
 			return 1;
