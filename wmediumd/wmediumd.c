@@ -685,16 +685,16 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 
 	/*send_tx_info_frame_nl(ctx, frame);*/
 	
-	memcpy(server_reply->data_tosend, data, data_len);
-	server_reply->data_len_tosend = frame->data_len;
-	server_reply->flags_tosend = frame->flags;
-	server_reply->cookie_tosend = frame->cookie;
-	server_reply->freq_tosend = frame->freq;
-	server_reply->rate_idx_tosend = rate_idx;
-	server_reply->signal_tosend = signal;
-	server_reply->fsignal_tosend = frame->signal;
-	server_reply->tx_rates_count_tosend = frame->tx_rates_count_tosend;
-	memcpy(server_reply->tx_rates_tosend, frame->tx_rates, sizeof(server_reply->tx_rates_tosend));
+	memcpy(server_reply.data_tosend, data, data_len);
+	server_reply.data_len_tosend = frame->data_len;
+	server_reply.flags_tosend = frame->flags;
+	server_reply.cookie_tosend = frame->cookie;
+	server_reply.freq_tosend = frame->freq;
+	server_reply.rate_idx_tosend = rate_idx;
+	server_reply.signal_tosend = signal;
+	server_reply.fsignal_tosend = frame->signal;
+	server_reply.tx_rates_count_tosend = frame->tx_rates_count_tosend;
+	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(server_reply.tx_rates_tosend));
 	
 	//Send the message back to client
 	write(sock, (char*)&server_reply, sizeof(mystruct_tosend));
@@ -798,28 +798,28 @@ static int process_messages_cb(void *arg)
 
 	pthread_rwlock_rdlock(&snr_lock);
 
-	if (client_message->data_len_tosend < 6 + 6 + 4)
+	if (client_message.data_len_tosend < 6 + 6 + 4)
 		goto out;
 
-	sender = get_station_by_addr(ctx, client_message->src_tosend);
+	sender = get_station_by_addr(ctx, client_message.src_tosend);
 	if (!sender) {
 		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
 		goto out;
 	}
-	memcpy(sender->hwaddr, client_message->hwaddr_tosend, ETH_ALEN);
+	memcpy(sender->hwaddr, client_message.hwaddr_tosend, ETH_ALEN);
 
-	frame = malloc(sizeof(*frame) + client_message->data_len_tosend);
+	frame = malloc(sizeof(*frame) + client_message.data_len_tosend);
 	if (!frame)
 		goto out;
 
-	memcpy(frame->data, client_message->data_tosend, client_message->data_len_tosend);
-	frame->data_len = client_message->data_len_tosend;
-	frame->flags = client_message->flags_tosend;
-	frame->cookie = client_message->cookie_tosend;
-	frame->freq = client_message->freq_tosend;
+	memcpy(frame->data, client_message.data_tosend, client_message.data_len_tosend);
+	frame->data_len = client_message.data_len_tosend;
+	frame->flags = client_message.flags_tosend;
+	frame->cookie = client_message.cookie_tosend;
+	frame->freq = client_message.freq_tosend;
 	frame->sender = sender;
-	frame->tx_rates_count = client_message->tx_rates_count_tosend;
-	memcpy(frame->tx_rates, client_message->tx_rates_tosend, sizeof(client_message->tx_rates_tosend));
+	frame->tx_rates_count = client_message.tx_rates_count_tosend;
+	memcpy(frame->tx_rates, client_message.tx_rates_tosend, sizeof(client_message.tx_rates_tosend));
 	queue_frame(ctx, sender, frame);
 
 	pthread_rwlock_unlock(&snr_lock);
