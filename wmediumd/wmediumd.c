@@ -604,7 +604,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	struct station *station;
 	u8 *dest = hdr->addr1;
 	u8 *src = frame->sender->addr;
-	sock = socket_to_global;
+	int sock = socket_to_global;
 	typedef struct{
 		u64 cookie_tosend;
 		u32 freq_tosend;
@@ -647,7 +647,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 
 				snr -= get_signal_offset_by_interference(ctx,
 					frame->sender->index, station->index);
-				rate_idx = frame->tx_rates[0].idx;
+				int rate_idx = frame->tx_rates[0].idx;
 				error_prob = ctx->get_error_prob(ctx,
 					(double)snr, rate_idx, frame->freq,
 					frame->data_len, frame->sender,
@@ -685,7 +685,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 
 	/*send_tx_info_frame_nl(ctx, frame);*/
 	
-	memcpy(server_reply.data_tosend, data, data_len);
+	memcpy(server_reply.data_tosend, frame->data, frame->data_len);
 	server_reply.data_len_tosend = frame->data_len;
 	server_reply.flags_tosend = frame->flags;
 	server_reply.cookie_tosend = frame->cookie;
@@ -693,7 +693,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	server_reply.rate_idx_tosend = rate_idx;
 	server_reply.signal_tosend = signal;
 	server_reply.fsignal_tosend = frame->signal;
-	server_reply.tx_rates_count_tosend = frame->tx_rates_count_tosend;
+	server_reply.tx_rates_count_tosend = frame->tx_rates_count;
 	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(server_reply.tx_rates_tosend));
 	
 	//Send the message back to client
@@ -794,7 +794,7 @@ static int process_messages_cb(void *arg)
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
 	struct station *sender;
 	struct frame *frame;
-	sock_w = socket_to_global;
+	int sock_w = socket_to_global;
 
 	pthread_rwlock_rdlock(&snr_lock);
 
@@ -803,7 +803,7 @@ static int process_messages_cb(void *arg)
 
 	sender = get_station_by_addr(ctx, client_message.src_tosend);
 	if (!sender) {
-		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
+		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(client_message.src_tosend));
 		goto out;
 	}
 	memcpy(sender->hwaddr, client_message.hwaddr_tosend, ETH_ALEN);
@@ -956,7 +956,7 @@ void *connection_handler(void *socket_desc)
 	int read_size;
 	
 	//Receive a message from client
-	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 )
+	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 ))
 	{
 		process_messages_cb();
 	}
@@ -1176,7 +1176,7 @@ int main(int argc, char *argv[])
 	free(ctx.intf);
 	free(ctx.per_matrix);
 	
-	close(sock);
+	close(client_sock);
 	
 	return EXIT_SUCCESS;
 }
