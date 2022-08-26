@@ -52,15 +52,11 @@ int socket_to_global = 0;
 struct wmediumd *ctx_to_pass;
 
 typedef struct{
-		u64 cookie_tosend;
-		u32 freq_tosend;
-		int flags_tosend;
-		int tx_rates_count_tosend;
-		struct hwsim_tx_rate tx_rates_tosend[IEEE80211_TX_MAX_RATES];
-		size_t data_len_tosend;
-		u8 data_tosend[0];
-		u8 hwaddr_tosend[ETH_ALEN];
-		u8 src_tosend;
+		__u32 	nlmsg_len_t;
+		__u16 	nlmsg_type_t;
+ 		__u16 	nlmsg_flags_t;
+ 		__u32 	nlmsg_seq_t;
+ 		__u32 	nlmsg_pid_t;
 	} mystruct_torecv;
 mystruct_torecv client_message;
 
@@ -791,7 +787,7 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
  * Handle events from the kernel.  Process CMD_FRAME events and queue them
  * for later delivery with the scheduler.
  */
-static int process_messages_cb(void *arg)
+static int process_messages_cb(void *arg, mystruct_torecv client_message)
 {
 	struct wmediumd *ctx = arg;
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
@@ -799,38 +795,74 @@ static int process_messages_cb(void *arg)
 	struct frame *frame;
 	int sock_w = socket_to_global;
 	u8 *src = client_message.src_tosend;
-
-	pthread_rwlock_rdlock(&snr_lock);
-
-	if (client_message.data_len_tosend < 6 + 6 + 4)
-		goto out;
-
-	sender = get_station_by_addr(ctx, src);
-	if (!sender) {
-		w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
-		goto out;
-	}
-	memcpy(sender->hwaddr, client_message.hwaddr_tosend, ETH_ALEN);
-
-	frame = malloc(sizeof(*frame) + client_message.data_len_tosend);
-	if (!frame){
-		goto out;
-	}
+	struct nlmsghdr *nlh;
 	
-	memcpy(frame->data, client_message.data_tosend, client_message.data_len_tosend);
-	frame->data_len = client_message.data_len_tosend;
-	frame->flags = client_message.flags_tosend;
-	frame->cookie = client_message.cookie_tosend;
-	frame->freq = client_message.freq_tosend;
-	frame->sender = sender;
-	frame->tx_rates_count = client_message.tx_rates_count_tosend;
-	memcpy(frame->tx_rates, client_message.tx_rates_tosend, sizeof(client_message.tx_rates_tosend));
-	queue_frame(ctx, sender, frame);
+	nlh -> nlmsg_len = message.nlmsg_len_t;
+	nlh -> nlmsg_type = message.nlmsg_type_t;
+	nlh -> nlmsg_flags = message.nlmsg_flags_t;
+	nlh -> nlmsg_seq = message.nlmsg_seq_t;
+	nlh -> nlmsg_pid = message.nlmsg_pid_t;
+	
+	struct genlmsghdr *gnlh = nlmsg_data(nlh);
+	if (gnlh->cmd == HWSIM_CMD_FRAME) {
+		pthread_rwlock_rdlock(&snr_lock);
+
+		/* we get the attributes*/
+			genlmsg_parse(nlh, 0, attrs, HWSIM_ATTR_MAX, NULL);
+			if (attrs[HWSIM_ATTR_ADDR_TRANSMITTER]) {
+				u8 *hwaddr = (u8 *)nla_data(attrs[HWSIM_ATTR_ADDR_TRANSMITTER]);
+
+				unsigned int data_len =
+					nla_len(attrs[HWSIM_ATTR_FRAME]);
+				char *data = (char *)nla_data(attrs[HWSIM_ATTR_FRAME]);
+				unsigned int flags =
+					nla_get_u32(attrs[HWSIM_ATTR_FLAGS]);
+				unsigned int tx_rates_len =
+					nla_len(attrs[HWSIM_ATTR_TX_INFO]);
+				struct hwsim_tx_rate *tx_rates =
+					(struct hwsim_tx_rate *)
+					nla_data(attrs[HWSIM_ATTR_TX_INFO]);
+				u64 cookie = nla_get_u64(attrs[HWSIM_ATTR_COOKIE]);
+				u32 freq;
+				freq = attrs[HWSIM_ATTR_FREQ] ?
+						nla_get_u32(attrs[HWSIM_ATTR_FREQ]) : 2412;
+
+				hdr = (struct ieee80211_hdr *)data;
+				src = hdr->addr2;
+
+				if (data_len < 6 + 6 + 4)
+					goto out;
+
+				sender = get_station_by_addr(ctx, src);
+				if (!sender) {
+					w_flogf(ctx, LOG_ERR, stderr, "Unable to find sender station " MAC_FMT "\n", MAC_ARGS(src));
+					goto out;
+				}
+				memcpy(sender->hwaddr, hwaddr, ETH_ALEN);
+
+				frame = malloc(sizeof(*frame) + data_len);
+				if (!frame)
+					goto out;
+
+				memcpy(frame->data, data, data_len);
+				frame->data_len = data_len;
+				frame->flags = flags;
+				frame->cookie = cookie;
+				frame->freq = freq;
+				frame->sender = sender;
+				sender->freq = freq;
+				frame->tx_rates_count =
+					tx_rates_len / sizeof(struct hwsim_tx_rate);
+				memcpy(frame->tx_rates, tx_rates,
+				       min(tx_rates_len, sizeof(frame->tx_rates)));
+				queue_frame(ctx, sender, frame);
+			}
 
 out:
 	pthread_rwlock_unlock(&snr_lock);
+	return 0;
 	
-		
+	}	
 	return 0;
 }
 
@@ -966,7 +998,7 @@ void *connection_handler(void *socket_desc)
 	//Receive a message from client
 	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 ))
 	{
-		process_messages_cb(ctx);
+		process_messages_cb(ctx, client_message);
 	}
 	
 	if(read_size == 0)
