@@ -50,6 +50,8 @@
 
 int socket_to_global = 0;
 struct wmediumd *ctx_to_pass;
+int sock_udp;                        
+struct sockaddr_in broadcastAddr;
 
 typedef struct{
 		__u32 	nlmsg_len_t;
@@ -658,7 +660,16 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 						   MAC_ARGS(src), MAC_ARGS(station->addr));
 					continue;
 				}
+				
+				char *sendString; //mettere struct da mandare
+				sendStringLen = strlen(sendString);  
 
+				/* Broadcast sendString in datagram to clients */
+				if (sendto(sock_udp, sendString, sendStringLen, 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sendStringLen){
+				    fprintf(stderr, "sendto error");
+				    exit(1);
+				}
+				
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
@@ -1025,6 +1036,13 @@ int main(int argc, char *argv[])
 	struct wmediumd ctx;
 	char *config_file = NULL;
 	char *per_file = NULL;
+	 
+   	char *broadcastIP;                
+   	unsigned short broadcastPort;                      
+   	int broadcastPermission;         
+   	int sendStringLen;
+   	broadcastIP = "255.255.255.255";  
+   	broadcastPort = 33333;
 		
 	
 	int socket_desc , client_sock , c , *new_sock;
@@ -1144,6 +1162,34 @@ int main(int argc, char *argv[])
 
 	if (start_server == true)
 		start_wserver(&ctx);
+	
+	/*Socket UDP opens*/
+
+   	if ((sock_udp = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
+       		fprintf(stderr, "socket error");
+        	exit(1);
+   	}
+
+   	broadcastPermission = 1;
+   	if (setsockopt(sock_udp, SOL_SOCKET, SO_BROADCAST, (void *) &broadcastPermission,sizeof(broadcastPermission)) < 0){
+       		fprintf(stderr, "setsockopt error");
+       		exit(1);
+   	}
+	
+	char loopch=0;
+
+	if (setsockopt(sock_udp, IPPROTO_IP, IP_MULTICAST_LOOP,
+               (char *)&loopch, sizeof(loopch)) < 0) {
+  		perror("setting IP_MULTICAST_LOOP:");
+  		close(sd);
+  		exit(1);
+	}
+
+   	/* Construct local address structure */
+   	memset(&broadcastAddr, 0, sizeof(broadcastAddr));   
+   	broadcastAddr.sin_family = AF_INET;                 
+   	broadcastAddr.sin_addr.s_addr = inet_addr(broadcastIP);
+   	broadcastAddr.sin_port = htons(broadcastPort);       
 	
 	/*Socket server opens*/
 	
