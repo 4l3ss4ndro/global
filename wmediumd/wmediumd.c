@@ -606,17 +606,21 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	int sock = socket_to_global;
 	typedef struct{
 		u64 cookie_tosend;
-		u32 freq_tosend;
 		int flags_tosend;
 		int tx_rates_count_tosend;
 		struct hwsim_tx_rate tx_rates_tosend[IEEE80211_TX_MAX_RATES];
-		size_t data_len_tosend;
-		u8 data_tosend[0];
-		int rate_idx_tosend;
 		int signal_tosend;
-		int fsignal_tosend;
 	} mystruct_tosend;
 	mystruct_tosend server_reply;
+	
+	typedef struct{
+		size_t data_len_tobroadcast;
+		u8 data_tobroadcast;
+		int rate_idx_tobroadcast;
+		int signal_tobroadcast;
+		u32 freq_tobroadcast;
+	} mystruct_tobroadcast;
+	mystruct_tobroadcast broad_mex;
 	
 	int rate_idx;
 
@@ -660,13 +664,16 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 						   MAC_ARGS(src), MAC_ARGS(station->addr));
 					continue;
 				}
-				
-				char *sendString; //mettere struct da mandare
-				sendStringLen = strlen(sendString);  
 
-				/* Broadcast sendString in datagram to clients */
-				if (sendto(sock_udp, sendString, sendStringLen, 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sendStringLen){
-				    fprintf(stderr, "sendto error");
+				broad_mex.data_len_tobroadcast = frame->data_len;
+				broad_mex.rate_idx_tobroadcast = rate_idx;
+				broad_mex.signal_tobroadcast = signal;
+				broad_mex.freq_tobroadcast = frame->freq;
+				broad_mex.data_tobroadcast = frame->data;
+				
+				/* Broadcast broad_mex in datagram to clients */
+				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
+				    fprintf(stderr, "broadcast sendto error");
 				    exit(1);
 				}
 				
@@ -681,6 +688,18 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					frame->signal))
 					continue;
 				rate_idx = frame->tx_rates[0].idx;
+				
+				broad_mex.data_len_tobroadcast = frame->data_len;
+				broad_mex.rate_idx_tobroadcast = rate_idx;
+				broad_mex.signal_tobroadcast = frame->signal;
+				broad_mex.freq_tobroadcast = frame->freq;
+				broad_mex.data_tobroadcast = frame->data;
+				
+				/* Broadcast broad_mex in datagram to clients */
+				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
+				    fprintf(stderr, "broadcast sendto error");
+				    exit(1);
+				}
 
 				send_cloned_frame_msg(ctx, station,
 						      frame->data,
@@ -694,17 +713,12 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 					  frame->duration, frame->signal);
 
 	/*send_tx_info_frame_nl(ctx, frame);*/
-	
-	memcpy(server_reply.data_tosend, frame->data, frame->data_len);
-	server_reply.data_len_tosend = frame->data_len;
+
 	server_reply.flags_tosend = frame->flags;
 	server_reply.cookie_tosend = frame->cookie;
-	server_reply.freq_tosend = frame->freq;
-	server_reply.rate_idx_tosend = rate_idx;
 	server_reply.signal_tosend = signal;
-	server_reply.fsignal_tosend = frame->signal;
 	server_reply.tx_rates_count_tosend = frame->tx_rates_count;
-	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(server_reply.tx_rates_tosend));
+	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(frame->tx_rates));
 	
 	//Send the message back to client
 	write(sock, (char*)&server_reply, sizeof(mystruct_tosend));
