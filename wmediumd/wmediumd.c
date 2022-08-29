@@ -54,11 +54,27 @@ int sock_udp;
 struct sockaddr_in broadcastAddr;
 
 typedef struct{
-		__u32 	nlmsg_len_t;
-		__u16 	nlmsg_type_t;
- 		__u16 	nlmsg_flags_t;
- 		__u32 	nlmsg_seq_t;
- 		__u32 	nlmsg_pid_t;
+		 __u32 nlmsg_len;
+		 __u16 nlmsg_type;
+		 __u16 nlmsg_flags;
+		 __u32 nlmsg_seq;
+		 __u32 nlmsg_pid;
+		 uint32_t nlmsg_len;
+		 uint16_t nlmsg_type;
+		 uint16_t nlmsg_flags;
+		 uint32_t nlmsg_seq;
+		 uint32_t nlmsg_pid;
+	} nlmsghdr_t;
+	
+	typedef struct{
+		int nm_protocol_t;
+		int nm_flags_t;
+ 		struct sockaddr_nl nm_src_t;
+ 		struct sockaddr_nl nm_dst_t;
+ 		struct ucred nm_creds_t;
+ 		struct nlmsghdr_t nm_nlh_t;
+ 		size_t nm_size_t;
+ 		int nm_refcnt_t;
 	} mystruct_torecv;
 mystruct_torecv client_message;
 
@@ -815,6 +831,17 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
 static int process_messages_cb(void *arg, mystruct_torecv client_message)
 {
 	struct wmediumd *ctx = arg;
+	struct nl_msg *msg;
+	
+	msg -> nm_protocol = message.nm_protocol_t;
+	msg -> nm_flags = message.nm_flags_t;
+	msg -> nm_size = message.nm_size_t;
+	msg -> nm_refcnt = message.nm_refcnt_t;
+	memcpy(msg -> nm_src, &message.nm_src_t, sizeof(message.nm_src_t));
+	memcpy(msg -> nm_dst, &message.nm_dst_t, sizeof(message.nm_dst_t));
+	memcpy(msg -> nm_creds, &message.nm_creds_t, sizeof(message.nm_creds_t));
+	memcpy(msg -> nm_nlh -> nlmsghdr, &message.nm_nlh_t, sizeof(message.nm_nlh_t));
+	
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
 	struct station *sender;
 	struct frame *frame;
