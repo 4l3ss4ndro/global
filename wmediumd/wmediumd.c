@@ -635,6 +635,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 		int rate_idx_tobroadcast;
 		int signal_tobroadcast;
 		u32 freq_tobroadcast;
+		int cmd_frame;
 	} mystruct_tobroadcast;
 	mystruct_tobroadcast broad_mex;
 	
@@ -686,6 +687,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				broad_mex.signal_tobroadcast = signal;
 				broad_mex.freq_tobroadcast = frame->freq;
 				broad_mex.data_tobroadcast = frame->data;
+				broad_mex.cmd_frame = 0;
 				
 				/* Broadcast broad_mex in datagram to clients */
 				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
@@ -710,6 +712,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				broad_mex.signal_tobroadcast = frame->signal;
 				broad_mex.freq_tobroadcast = frame->freq;
 				broad_mex.data_tobroadcast = frame->data;
+				broad_mex.cmd_frame = 1;
 				
 				/* Broadcast broad_mex in datagram to clients */
 				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
