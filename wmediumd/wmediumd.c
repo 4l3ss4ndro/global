@@ -1266,7 +1266,7 @@ int main(int argc, char *argv[])
 	puts("Waiting for incoming connections...");
 	c = sizeof(struct sockaddr_in);
 	
-	
+	ctx_to_pass = ctx;
 	//Accept and incoming connection
 	puts("Waiting for incoming connections...");
 	c = sizeof(struct sockaddr_in);
