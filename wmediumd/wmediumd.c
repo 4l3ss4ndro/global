@@ -46,7 +46,7 @@
 #include <string.h>	//strlen
 #include <sys/socket.h>	//socket
 #include <arpa/inet.h>	//inet_addr
-#include<pthread.h> //for threading , link with lpthread
+#include <pthread.h> //for threading , link with lpthread
 
 int socket_to_global = 0;
 struct wmediumd *ctx_to_pass;
