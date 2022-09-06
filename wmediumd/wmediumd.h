@@ -32,6 +32,9 @@
 #define HWSIM_CMD_FRAME 2
 #define HWSIM_CMD_TX_INFO_FRAME 3
 
+//#define NL_AUTO_SEQ 0
+//#define NL_AUTO_PID 0
+
 /**
  * enum hwsim_attrs - hwsim netlink attributes
  *
@@ -110,11 +113,19 @@ enum {
 #include <stdbool.h>
 #include <syslog.h>
 #include <stdio.h>
+//#include <linux/netlink.h>
+#include <netlink/netlink.h>
+#include <netlink/genl/genl.h>
+#include <netlink/genl/family.h>
+#include <netlink/genl/ctrl.h>
+
+#include <linux/socket.h>
 
 #include "list.h"
 #include "ieee80211.h"
 
 typedef uint8_t u8;
+typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
@@ -136,6 +147,30 @@ struct wqueue {
 	struct list_head frames;
 	int cw_min;
 	int cw_max;
+};
+
+typedef struct{
+		int sockfd_udp_t; 
+		struct sockaddr_in  cliaddr_udp_t;
+} thread_args;
+
+typedef unsigned short __kernel_sa_family;
+
+struct ucred {
+		u32 pid;
+		u32 uid;
+ 		u32 gid;
+};
+
+struct nl_msg {
+		int nm_protocol;
+		int nm_flags;
+		struct sockaddr_nl nm_src;
+		struct sockaddr_nl nm_dst;
+		struct ucred nm_creds;
+		struct nlmsghdr * nm_nlh;
+		size_t nm_size;
+		int nm_refcnt;
 };
 
 struct station {
