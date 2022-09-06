@@ -21,10 +21,6 @@
  *	02110-1301, USA.
  */
 
-#include <netlink/netlink.h>
-#include <netlink/genl/genl.h>
-#include <netlink/genl/ctrl.h>
-#include <netlink/genl/family.h>
 #include <stdint.h>
 #include <getopt.h>
 #include <signal.h>
@@ -35,7 +31,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <pthread.h>
-
+ #include <linux/netlink.h>
 #include "wmediumd.h"
 #include "ieee80211.h"
 #include "config.h"
@@ -46,25 +42,11 @@
 #include <string.h>	//strlen
 #include <sys/socket.h>	//socket
 #include <arpa/inet.h>	//inet_addr
-#include <pthread.h> //for threading , link with lpthread
 
 int socket_to_global = 0;
 struct wmediumd *ctx_to_pass;
 int sock_udp;                        
 struct sockaddr_in broadcastAddr;
-
-typedef struct{
-		 __u32 nlmsg_len;
-		 __u16 nlmsg_type;
-		 __u16 nlmsg_flags;
-		 __u32 nlmsg_seq;
-		 __u32 nlmsg_pid;
-		 uint32_t nlmsg_len;
-		 uint16_t nlmsg_type;
-		 uint16_t nlmsg_flags;
-		 uint32_t nlmsg_seq;
-		 uint32_t nlmsg_pid;
-	} nlmsghdr_t;
 	
 	typedef struct{
 		int nm_protocol_t;
@@ -737,7 +719,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	server_reply.cookie_tosend = frame->cookie;
 	server_reply.signal_tosend = signal;
 	server_reply.tx_rates_count_tosend = frame->tx_rates_count;
-	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(frame->tx_rates));
+	server_reply.tx_rates_tosend = frame->tx_rates;
 	
 	//Send the message back to client
 	write(sock, (char*)&server_reply, sizeof(mystruct_tosend));
@@ -840,10 +822,10 @@ static int process_messages_cb(void *arg, mystruct_torecv client_message)
 	msg -> nm_flags = message.nm_flags_t;
 	msg -> nm_size = message.nm_size_t;
 	msg -> nm_refcnt = message.nm_refcnt_t;
-	memcpy(msg -> nm_src, &message.nm_src_t, sizeof(message.nm_src_t));
-	memcpy(msg -> nm_dst, &message.nm_dst_t, sizeof(message.nm_dst_t));
-	memcpy(msg -> nm_creds, &message.nm_creds_t, sizeof(message.nm_creds_t));
-	memcpy(msg -> nm_nlh -> nlmsghdr, &message.nm_nlh_t, sizeof(message.nm_nlh_t));
+	msg -> nm_src = message.nm_src_t;
+	msg -> nm_dst = message.nm_dst_t;
+	msg -> nm_creds = message.nm_creds_t;
+	*(msg -> nm_nlh) = message.nm_nlh_t;
 	
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
 	struct station *sender;
@@ -1089,8 +1071,8 @@ int main(int argc, char *argv[])
    	broadcastPort = 33333;
 		
 	
-	int socket_desc , client_sock , c , *new_sock;
-	struct sockaddr_in server , client;
+	int socket_desc, client_sock, c, *new_sock;
+	struct sockaddr_in server, client;
 
 
 	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
@@ -1266,7 +1248,7 @@ int main(int argc, char *argv[])
 	puts("Waiting for incoming connections...");
 	c = sizeof(struct sockaddr_in);
 	
-	ctx_to_pass = ctx;
+	ctx_to_pass = &ctx;
 	//Accept and incoming connection
 	puts("Waiting for incoming connections...");
 	c = sizeof(struct sockaddr_in);
