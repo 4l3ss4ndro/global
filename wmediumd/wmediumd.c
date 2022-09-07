@@ -47,7 +47,7 @@ int socket_to_global = 0;
 struct wmediumd *ctx_to_pass;
 int sock_udp;                        
 struct sockaddr_in broadcastAddr;
-mystruct_torecv client_message;
+mystruct_nlmsg client_message;
 
 static inline int div_round(int a, int b)
 {
@@ -592,7 +592,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	u8 *src = frame->sender->addr;
 	int sock = socket_to_global;
 
-	mystruct_tosend server_reply;
+	mystruct_frame server_reply;
 	mystruct_tobroadcast broad_mex;
 	
 	int rate_idx;
