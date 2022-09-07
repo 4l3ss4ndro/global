@@ -149,6 +149,11 @@ struct wqueue {
 	int cw_max;
 };
 
+struct hwsim_tx_rate {
+	signed char idx;
+	unsigned char count;
+};
+
 typedef struct{
 		int sockfd_udp_t; 
 		struct sockaddr_in  cliaddr_udp_t;
@@ -256,11 +261,6 @@ struct wmediumd {
 	u8 log_lvl;
 };
 
-struct hwsim_tx_rate {
-	signed char idx;
-	unsigned char count;
-};
-
 struct frame {
 	struct list_head list;		/* frame queue list */
 	struct timespec expires;	/* frame delivery (absolute) */
@@ -319,3 +319,4 @@ int index_to_rate(size_t index, u32 freq);
 void detect_mediums(struct wmediumd *ctx, struct station *src, struct station *dest);
 
 #endif /* WMEDIUMD_H_ */
+
