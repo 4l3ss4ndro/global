@@ -699,7 +699,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(frame->tx_rates));
 	
 	//Send the message back to client
-	write(sock, (char*)&server_reply, sizeof(mystruct_tosend));
+	write(sock, (char*)&server_reply, sizeof(mystruct_frame));
 
 	free(frame);
 }
@@ -1003,7 +1003,7 @@ void *connection_handler(void *socket_desc)
 	struct wmediumd *ctx = ctx_to_pass;
 	
 	//Receive a message from client
-	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_torecv), 0) > 0 ))
+	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_nlmsg), 0) > 0 ))
 	{
 		process_messages_cb(ctx, client_message);
 	}
