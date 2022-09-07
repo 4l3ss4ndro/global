@@ -189,7 +189,7 @@ typedef struct{
 		int tx_rates_count_tosend;
 		struct hwsim_tx_rate tx_rates_tosend[IEEE80211_TX_MAX_RATES];
 		int signal_tosend;
-	} mystruct_tosend;
+	} mystruct_frame;
 
 typedef struct{
 		int nm_protocol_t;
@@ -200,7 +200,7 @@ typedef struct{
  		struct nlmsghdr nm_nlh_t;
  		size_t nm_size_t;
  		int nm_refcnt_t;
-	} mystruct_torecv;
+	} mystruct_nlmsg;
 
 struct station {
 	int index;
