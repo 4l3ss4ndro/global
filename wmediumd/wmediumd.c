@@ -47,17 +47,6 @@ int socket_to_global = 0;
 struct wmediumd *ctx_to_pass;
 int sock_udp;                        
 struct sockaddr_in broadcastAddr;
-	
-	typedef struct{
-		int nm_protocol_t;
-		int nm_flags_t;
- 		struct sockaddr_nl nm_src_t;
- 		struct sockaddr_nl nm_dst_t;
- 		struct ucred nm_creds_t;
- 		struct nlmsghdr nm_nlh_t;
- 		size_t nm_size_t;
- 		int nm_refcnt_t;
-	} mystruct_torecv;
 mystruct_torecv client_message;
 
 static inline int div_round(int a, int b)
@@ -602,23 +591,8 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	u8 *dest = hdr->addr1;
 	u8 *src = frame->sender->addr;
 	int sock = socket_to_global;
-	typedef struct{
-		u64 cookie_tosend;
-		int flags_tosend;
-		int tx_rates_count_tosend;
-		struct hwsim_tx_rate tx_rates_tosend[IEEE80211_TX_MAX_RATES];
-		int signal_tosend;
-	} mystruct_tosend;
+
 	mystruct_tosend server_reply;
-	
-	typedef struct{
-		size_t data_len_tobroadcast;
-		u8 data_tobroadcast;
-		int rate_idx_tobroadcast;
-		int signal_tobroadcast;
-		u32 freq_tobroadcast;
-		int cmd_frame;
-	} mystruct_tobroadcast;
 	mystruct_tobroadcast broad_mex;
 	
 	int rate_idx;
@@ -670,6 +644,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				broad_mex.freq_tobroadcast = frame->freq;
 				broad_mex.data_tobroadcast = frame->data;
 				broad_mex.cmd_frame = 0;
+				broad_mex.hwaddr = station->hwaddr;
 				
 				/* Broadcast broad_mex in datagram to clients */
 				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
@@ -677,11 +652,12 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				    exit(1);
 				}
 				
-				send_cloned_frame_msg(ctx, station,
+				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, signal,
-						      frame->freq);
+						      frame->freq);*/
+				
 			} else if (memcmp(dest, station->addr, ETH_ALEN) == 0) {
 				if (set_interference_duration(ctx,
 					frame->sender->index, frame->duration,
@@ -695,6 +671,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				broad_mex.freq_tobroadcast = frame->freq;
 				broad_mex.data_tobroadcast = frame->data;
 				broad_mex.cmd_frame = 1;
+				broad_mex.hwaddr = station->hwaddr;
 				
 				/* Broadcast broad_mex in datagram to clients */
 				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
@@ -702,11 +679,11 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				    exit(1);
 				}
 
-				send_cloned_frame_msg(ctx, station,
+				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
 						      rate_idx, frame->signal,
-						      frame->freq);
+						      frame->freq);*/
   			}
 		}
 	} else
@@ -831,15 +808,8 @@ static int process_messages_cb(void *arg, mystruct_torecv client_message)
 	struct station *sender;
 	struct frame *frame;
 	int sock_w = socket_to_global;
-	u8 *src = client_message.src_tosend;
-	struct nlmsghdr *nlh;
-	
-	nlh -> nlmsg_len = client_message.nlmsg_len_t;
-	nlh -> nlmsg_type = client_message.nlmsg_type_t;
-	nlh -> nlmsg_flags = client_message.nlmsg_flags_t;
-	nlh -> nlmsg_seq = client_message.nlmsg_seq_t;
-	nlh -> nlmsg_pid = client_message.nlmsg_pid_t;
-	
+	u8 *src;
+	struct nlmsghdr *nlh = nlmsg_hdr(msg);
 	struct genlmsghdr *gnlh = nlmsg_data(nlh);
 	if (gnlh->cmd == HWSIM_CMD_FRAME) {
 		pthread_rwlock_rdlock(&snr_lock);
