@@ -790,7 +790,7 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
  * Handle events from the kernel.  Process CMD_FRAME events and queue them
  * for later delivery with the scheduler.
  */
-static int process_messages_cb(void *arg, mystruct_torecv client_message)
+static int process_messages_cb(void *arg, mystruct_nlmsg client_message)
 {
 	struct wmediumd *ctx = arg;
 	struct nl_msg *msg;
