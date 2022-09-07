@@ -54,7 +54,7 @@ struct sockaddr_in broadcastAddr;
  		struct sockaddr_nl nm_src_t;
  		struct sockaddr_nl nm_dst_t;
  		struct ucred nm_creds_t;
- 		struct nlmsghdr_t nm_nlh_t;
+ 		struct nlmsghdr nm_nlh_t;
  		size_t nm_size_t;
  		int nm_refcnt_t;
 	} mystruct_torecv;
@@ -719,7 +719,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	server_reply.cookie_tosend = frame->cookie;
 	server_reply.signal_tosend = signal;
 	server_reply.tx_rates_count_tosend = frame->tx_rates_count;
-	server_reply.tx_rates_tosend = frame->tx_rates;
+	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(frame->tx_rates));
 	
 	//Send the message back to client
 	write(sock, (char*)&server_reply, sizeof(mystruct_tosend));
@@ -818,14 +818,14 @@ static int process_messages_cb(void *arg, mystruct_torecv client_message)
 	struct wmediumd *ctx = arg;
 	struct nl_msg *msg;
 	
-	msg -> nm_protocol = message.nm_protocol_t;
-	msg -> nm_flags = message.nm_flags_t;
-	msg -> nm_size = message.nm_size_t;
-	msg -> nm_refcnt = message.nm_refcnt_t;
-	msg -> nm_src = message.nm_src_t;
-	msg -> nm_dst = message.nm_dst_t;
-	msg -> nm_creds = message.nm_creds_t;
-	*(msg -> nm_nlh) = message.nm_nlh_t;
+	msg -> nm_protocol = client_message.nm_protocol_t;
+	msg -> nm_flags = client_message.nm_flags_t;
+	msg -> nm_size = client_message.nm_size_t;
+	msg -> nm_refcnt = client_message.nm_refcnt_t;
+	msg -> nm_src = client_message.nm_src_t;
+	msg -> nm_dst = client_message.nm_dst_t;
+	msg -> nm_creds = client_message.nm_creds_t;
+	*(msg -> nm_nlh) = client_message.nm_nlh_t;
 	
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
 	struct station *sender;
@@ -834,11 +834,11 @@ static int process_messages_cb(void *arg, mystruct_torecv client_message)
 	u8 *src = client_message.src_tosend;
 	struct nlmsghdr *nlh;
 	
-	nlh -> nlmsg_len = message.nlmsg_len_t;
-	nlh -> nlmsg_type = message.nlmsg_type_t;
-	nlh -> nlmsg_flags = message.nlmsg_flags_t;
-	nlh -> nlmsg_seq = message.nlmsg_seq_t;
-	nlh -> nlmsg_pid = message.nlmsg_pid_t;
+	nlh -> nlmsg_len = client_message.nlmsg_len_t;
+	nlh -> nlmsg_type = client_message.nlmsg_type_t;
+	nlh -> nlmsg_flags = client_message.nlmsg_flags_t;
+	nlh -> nlmsg_seq = client_message.nlmsg_seq_t;
+	nlh -> nlmsg_pid = client_message.nlmsg_pid_t;
 	
 	struct genlmsghdr *gnlh = nlmsg_data(nlh);
 	if (gnlh->cmd == HWSIM_CMD_FRAME) {
@@ -1207,7 +1207,7 @@ int main(int argc, char *argv[])
 	if (setsockopt(sock_udp, IPPROTO_IP, IP_MULTICAST_LOOP,
                (char *)&loopch, sizeof(loopch)) < 0) {
   		perror("setting IP_MULTICAST_LOOP:");
-  		close(sd);
+  		close(sock_udp);
   		exit(1);
 	}
 
