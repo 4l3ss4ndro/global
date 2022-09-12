@@ -592,6 +592,8 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	int sock = socket_to_global;
 
 	mystruct_frame server_reply;
+	mystruct_frame* frame_tosend;
+	frame_tosend = &server_reply;
 	mystruct_tobroadcast broad_mex;
 	
 	int rate_idx;
@@ -699,7 +701,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 	memcpy(server_reply.tx_rates_tosend, frame->tx_rates, sizeof(frame->tx_rates));
 	
 	//Send the message back to client
-	write(sock, (char*)&server_reply, sizeof(mystruct_frame));
+	send(sock, frame_tosend, sizeof(frame_tosend), 0);
 
 	free(frame);
 }
@@ -1006,6 +1008,8 @@ void *connection_handler(void *socket_desc)
 	mystruct_nlmsg *client_message;
 	mystruct_nlmsg torecv;
     	client_message = &torecv;
+	
+	socket_to_global = sock;
 	
 	//Receive a message from client
 	while( (read_size = read(sock, client_message, sizeof(client_message)) > 0 ))
