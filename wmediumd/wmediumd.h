@@ -154,11 +154,6 @@ struct hwsim_tx_rate {
 	unsigned char count;
 };
 
-typedef struct{
-		int sockfd_udp_t; 
-		struct sockaddr_in  cliaddr_udp_t;
-} thread_args;
-
 typedef unsigned short __kernel_sa_family;
 
 struct ucred {
