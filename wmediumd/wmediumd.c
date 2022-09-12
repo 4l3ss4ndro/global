@@ -45,9 +45,8 @@
 
 int socket_to_global = 0;
 struct wmediumd *ctx_to_pass;
-int sock_udp;                        
-struct sockaddr_in broadcastAddr;
-mystruct_nlmsg client_message;
+int sockfd_udp;                        
+struct sockaddr_in addr_udp;
 
 static inline int div_round(int a, int b)
 {
@@ -646,11 +645,12 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				broad_mex.cmd_frame = 0;
 				memcpy(broad_mex.hwaddr, station->hwaddr, ETH_ALEN);
 				
-				/* Broadcast broad_mex in datagram to clients */
-				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
+				/* Broadcast broad_mex*/
+				if (sendto(sock_udp, (mystruct_tobroadcast*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&addr_udp, sizeof(addr_udp)) != sizeof(broad_mex)){
 				    fprintf(stderr, "broadcast sendto error");
 				    exit(1);
 				}
+				printf("UDP broadcast data sent.");
 				
 				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
@@ -674,11 +674,11 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				memcpy(broad_mex.hwaddr, station->hwaddr, ETH_ALEN);
 				
 				/* Broadcast broad_mex in datagram to clients */
-				if (sendto(sock_udp, (char*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&broadcastAddr, sizeof(broadcastAddr)) != sizeof(broad_mex)){
+				if (sendto(sock_udp, (mystruct_tobroadcast*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&addr_udp, sizeof(addr_udp)) != sizeof(broad_mex)){
 				    fprintf(stderr, "broadcast sendto error");
 				    exit(1);
 				}
-
+				printf("UDP broadcast data sent.");
 				/*send_cloned_frame_msg(ctx, station,
 						      frame->data,
 						      frame->data_len,
@@ -790,19 +790,19 @@ int nl_err_cb(struct sockaddr_nl *nla, struct nlmsgerr *nlerr, void *arg)
  * Handle events from the kernel.  Process CMD_FRAME events and queue them
  * for later delivery with the scheduler.
  */
-static int process_messages_cb(void *arg, mystruct_nlmsg client_message)
+static int process_messages_cb(void *arg, mystruct_nlmsg torecv_t)
 {
 	struct wmediumd *ctx = arg;
 	struct nl_msg *msg;
 	
-	msg -> nm_protocol = client_message.nm_protocol_t;
-	msg -> nm_flags = client_message.nm_flags_t;
-	msg -> nm_size = client_message.nm_size_t;
-	msg -> nm_refcnt = client_message.nm_refcnt_t;
-	msg -> nm_src = client_message.nm_src_t;
-	msg -> nm_dst = client_message.nm_dst_t;
-	msg -> nm_creds = client_message.nm_creds_t;
-	*(msg -> nm_nlh) = client_message.nm_nlh_t;
+	msg -> nm_protocol = torecv_t.nm_protocol_t;
+	msg -> nm_flags = torecv_t.nm_flags_t;
+	msg -> nm_size = torecv_t.nm_size_t;
+	msg -> nm_refcnt = torecv_t.nm_refcnt_t;
+	msg -> nm_src = torecv_t.nm_src_t;
+	msg -> nm_dst = torecv_t.nm_dst_t;
+	msg -> nm_creds = torecv_t.nm_creds_t;
+	*(msg -> nm_nlh) = torecv_t.nm_nlh_t;
 	
 	struct nlattr *attrs[HWSIM_ATTR_MAX+1];
 	struct station *sender;
@@ -1003,11 +1003,14 @@ void *connection_handler(void *socket_desc)
 	int sock = *(int*)socket_desc;
 	int read_size;
 	struct wmediumd *ctx = ctx_to_pass;
+	mystruct_nlmsg *client_message;
+	mystruct_nlmsg torecv;
+    	client_message = &torecv;
 	
 	//Receive a message from client
-	while( (read_size = recv(sock , (char *)&client_message , sizeof(mystruct_nlmsg), 0) > 0 ))
+	while( (read_size = read(sock, client_message, sizeof(client_message)) > 0 ))
 	{
-		process_messages_cb(ctx, client_message);
+		process_messages_cb(ctx, torecv);
 	}
 	
 	if(read_size == 0)
@@ -1035,16 +1038,92 @@ int main(int argc, char *argv[])
 	char *config_file = NULL;
 	char *per_file = NULL;
 	 
-   	char *broadcastIP;                
-   	unsigned short broadcastPort;                      
-   	int broadcastPermission;         
-   	int sendStringLen;
-   	broadcastIP = "255.255.255.255";  
-   	broadcastPort = 33333;
-		
+   	int server_fd, new_socket, valread;
+	struct sockaddr_in address;
+	int opt = 1;
+	int addrlen = sizeof(address);
+	int *new_sock;
 	
-	int socket_desc, client_sock, c, *new_sock;
-	struct sockaddr_in server, client;
+	char *ip_udp = "10.0.0.255";
+	int port_udp = 8080;
+	int yes = 1;
+	socklen_t addr_size;
+
+	//UDP broadcast socket
+	sockfd_udp = socket(AF_INET, SOCK_DGRAM, 0);
+
+	int ret = setsockopt(sockfd_udp, SOL_SOCKET, SO_BROADCAST, (char*)&yes, sizeof(yes));
+	if (ret == -1) {
+	perror("setsockopt error");
+	return 0;
+	}
+
+	memset(&addr_udp, '\0', sizeof(addr_udp));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port_udp);
+	addr.sin_addr.s_addr = inet_addr(ip_udp);
+	
+	// Creating TCP socket file descriptor
+	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0))
+		== 0) {
+		perror("socket failed");
+		exit(EXIT_FAILURE);
+	}
+
+	// Forcefully attaching socket to the port 8090
+	if (setsockopt(server_fd, SOL_SOCKET,
+				SO_REUSEADDR | SO_REUSEPORT, &opt,
+				sizeof(opt))) {
+		perror("setsockopt");
+		exit(EXIT_FAILURE);
+	}
+	address.sin_family = AF_INET;
+	address.sin_addr.s_addr = INADDR_ANY;
+	address.sin_port = htons(8090);
+
+	// Forcefully attaching socket to the port 8090
+	if (bind(server_fd, (struct sockaddr*)&address,
+			sizeof(address))
+		< 0) {
+		perror("bind failed");
+		exit(EXIT_FAILURE);
+	}
+	if (listen(server_fd, 3) < 0) {
+		perror("listen");
+		exit(EXIT_FAILURE);
+	}
+	
+	ctx_to_pass = &ctx;
+	
+	//Accept and incoming connection
+	puts("Waiting for incoming TCP connections...");
+
+	while( (new_socket
+		= accept(server_fd, (struct sockaddr*)&address,
+				(socklen_t*)&addrlen))
+	{
+		puts("TCP connection accepted");
+		
+		pthread_t sniffer_thread;
+		new_sock = malloc(1);
+		*new_sock = new_socket;
+		
+		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock) < 0)
+		{
+			perror("could not create thread");
+			return 1;
+		}
+		
+		//Now join the thread , so that we don't terminate before the thread
+		pthread_join( sniffer_thread , NULL);
+		puts("Handler assigned");
+	}
+	
+	if (new_socket < 0)
+	{
+		perror("TCP accept failed");
+		return 1;
+	}
 
 
 	setvbuf(stdout, NULL, _IOLBF, BUFSIZ);
@@ -1161,94 +1240,6 @@ int main(int argc, char *argv[])
 	if (start_server == true)
 		start_wserver(&ctx);
 	
-	/*Socket UDP opens*/
-
-   	if ((sock_udp = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
-       		fprintf(stderr, "socket error");
-        	exit(1);
-   	}
-
-   	broadcastPermission = 1;
-   	if (setsockopt(sock_udp, SOL_SOCKET, SO_BROADCAST, (void *) &broadcastPermission,sizeof(broadcastPermission)) < 0){
-       		fprintf(stderr, "setsockopt error");
-       		exit(1);
-   	}
-	
-	char loopch=0;
-
-	if (setsockopt(sock_udp, IPPROTO_IP, IP_MULTICAST_LOOP,
-               (char *)&loopch, sizeof(loopch)) < 0) {
-  		perror("setting IP_MULTICAST_LOOP:");
-  		close(sock_udp);
-  		exit(1);
-	}
-
-   	/* Construct local address structure */
-   	memset(&broadcastAddr, 0, sizeof(broadcastAddr));   
-   	broadcastAddr.sin_family = AF_INET;                 
-   	broadcastAddr.sin_addr.s_addr = inet_addr(broadcastIP);
-   	broadcastAddr.sin_port = htons(broadcastPort);       
-	
-	/*Socket server opens*/
-	
-	//Create socket
-	socket_desc = socket(AF_INET , SOCK_STREAM , 0);
-	if (socket_desc == -1)
-	{
-		printf("Could not create socket");
-	}
-	puts("Socket created");
-	
-	//Prepare the sockaddr_in structure
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons( 8888 );
-	
-	//Bind
-	if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0)
-	{
-		//print the error message
-		perror("bind failed. Error");
-		return 1;
-	}
-	puts("bind done");
-	
-	//Listen
-	listen(socket_desc , 3);
-	
-	//Accept and incoming connection
-	puts("Waiting for incoming connections...");
-	c = sizeof(struct sockaddr_in);
-	
-	ctx_to_pass = &ctx;
-	//Accept and incoming connection
-	puts("Waiting for incoming connections...");
-	c = sizeof(struct sockaddr_in);
-	while( (client_sock = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&c)) )
-	{
-		puts("Connection accepted");
-		
-		pthread_t sniffer_thread;
-		new_sock = malloc(1);
-		*new_sock = client_sock;
-		
-		if( pthread_create( &sniffer_thread , NULL ,  connection_handler , (void*) new_sock) < 0)
-		{
-			perror("could not create thread");
-			return 1;
-		}
-		
-		//Now join the thread , so that we don't terminate before the thread
-		//pthread_join( sniffer_thread , NULL);
-		puts("Handler assigned");
-	}
-	
-	if (client_sock < 0)
-	{
-		perror("accept failed");
-		return 1;
-	}
-	
 	/* enter libevent main loop */
 	event_dispatch();
 
@@ -1260,7 +1251,7 @@ int main(int argc, char *argv[])
 	free(ctx.intf);
 	free(ctx.per_matrix);
 	
-	close(client_sock);
+	close(new_socket);
 	
 	return EXIT_SUCCESS;
 }
