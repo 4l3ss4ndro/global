@@ -32,9 +32,6 @@
 #define HWSIM_CMD_FRAME 2
 #define HWSIM_CMD_TX_INFO_FRAME 3
 
-//#define NL_AUTO_SEQ 0
-//#define NL_AUTO_PID 0
-
 /**
  * enum hwsim_attrs - hwsim netlink attributes
  *
@@ -107,25 +104,16 @@ enum {
 #define GAUSS_RANDOM_DEFAULT 1
 #define HEIGHT_DEFAULT 1
 #define AP_DEFAULT 2
-#define MEDIUM_ID_DEFAULT 0
 
 #include <stdint.h>
 #include <stdbool.h>
 #include <syslog.h>
 #include <stdio.h>
-//#include <linux/netlink.h>
-#include <netlink/netlink.h>
-#include <netlink/genl/genl.h>
-#include <netlink/genl/family.h>
-#include <netlink/genl/ctrl.h>
-
-#include <linux/socket.h>
 
 #include "list.h"
 #include "ieee80211.h"
 
 typedef uint8_t u8;
-typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
@@ -141,66 +129,12 @@ typedef uint64_t u64;
 
 #define NOISE_LEVEL	(-91)
 #define CCA_THRESHOLD	(-90)
-#define ENABLE_MEDIUM_DETECTION	true
 
 struct wqueue {
 	struct list_head frames;
 	int cw_min;
 	int cw_max;
 };
-
-struct hwsim_tx_rate {
-	signed char idx;
-	unsigned char count;
-};
-
-typedef unsigned short __kernel_sa_family;
-
-struct ucred {
-		u32 pid;
-		u32 uid;
- 		u32 gid;
-};
-
-struct nl_msg {
-		int nm_protocol;
-		int nm_flags;
-		struct sockaddr_nl nm_src;
-		struct sockaddr_nl nm_dst;
-		struct ucred nm_creds;
-		struct nlmsghdr * nm_nlh;
-		size_t nm_size;
-		int nm_refcnt;
-};
-
-typedef struct{
-		size_t data_len_tobroadcast;
-		u8 data_tobroadcast;
-		int rate_idx_tobroadcast;
-		int signal_tobroadcast;
-		u32 freq_tobroadcast;
-		int cmd_frame;
-		u8 hwaddr[ETH_ALEN];
-	} mystruct_tobroadcast;
-
-typedef struct{
-		u64 cookie_tosend;
-		int flags_tosend;
-		int tx_rates_count_tosend;
-		struct hwsim_tx_rate tx_rates_tosend[IEEE80211_TX_MAX_RATES];
-		int signal_tosend;
-	} mystruct_frame;
-
-typedef struct{
-		int nm_protocol_t;
-		int nm_flags_t;
- 		struct sockaddr_nl nm_src_t;
- 		struct sockaddr_nl nm_dst_t;
- 		struct ucred nm_creds_t;
- 		struct nlmsghdr nm_nlh_t;
- 		size_t nm_size_t;
- 		int nm_refcnt_t;
-	} mystruct_nlmsg;
 
 struct station {
 	int index;
@@ -216,14 +150,13 @@ struct station {
 	double freq;			/* frequency [Mhz] */
 	struct wqueue queues[IEEE80211_NUM_ACS];
 	struct list_head list;
-    int medium_id;
 };
 
 struct wmediumd {
 	int timerfd;
 
 	struct nl_sock *sock;
-    bool enable_medium_detection;
+
 	int num_stas;
 	struct list_head stations;
 	struct station **sta_array;
@@ -254,6 +187,11 @@ struct wmediumd {
 	int (*get_fading_signal)(struct wmediumd *);
 
 	u8 log_lvl;
+};
+
+struct hwsim_tx_rate {
+	signed char idx;
+	unsigned char count;
 };
 
 struct frame {
@@ -311,6 +249,5 @@ int read_per_file(struct wmediumd *ctx, const char *file_name);
 int w_logf(struct wmediumd *ctx, u8 level, const char *format, ...);
 int w_flogf(struct wmediumd *ctx, u8 level, FILE *stream, const char *format, ...);
 int index_to_rate(size_t index, u32 freq);
-void detect_mediums(struct wmediumd *ctx, struct station *src, struct station *dest);
 
 #endif /* WMEDIUMD_H_ */
