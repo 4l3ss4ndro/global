@@ -648,7 +648,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				memcpy(broad_mex.hwaddr, station->hwaddr, ETH_ALEN);
 				
 				/* Broadcast broad_mex*/
-				if (sendto(sock_udp, (mystruct_tobroadcast*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&addr_udp, sizeof(addr_udp)) != sizeof(broad_mex)){
+				if (sendto(sockfd_udp, (mystruct_tobroadcast*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&addr_udp, sizeof(addr_udp)) != sizeof(broad_mex)){
 				    fprintf(stderr, "broadcast sendto error");
 				    exit(1);
 				}
@@ -676,7 +676,7 @@ void deliver_frame(struct wmediumd *ctx, struct frame *frame)
 				memcpy(broad_mex.hwaddr, station->hwaddr, ETH_ALEN);
 				
 				/* Broadcast broad_mex in datagram to clients */
-				if (sendto(sock_udp, (mystruct_tobroadcast*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&addr_udp, sizeof(addr_udp)) != sizeof(broad_mex)){
+				if (sendto(sockfd_udp, (mystruct_tobroadcast*)&broad_mex, sizeof(broad_mex), 0, (struct sockaddr *)&addr_udp, sizeof(addr_udp)) != sizeof(broad_mex)){
 				    fprintf(stderr, "broadcast sendto error");
 				    exit(1);
 				}
@@ -1035,7 +1035,6 @@ void *connection_handler(void *socket_desc)
 
 int main(int argc, char *argv[])
 {
-	int opt;
 	struct event ev_cmd;
 	struct event ev_timer;
 	struct wmediumd ctx;
@@ -1051,6 +1050,8 @@ int main(int argc, char *argv[])
 	char *ip_udp = "10.0.0.255";
 	int port_udp = 8080;
 	int yes = 1;
+	int sockfd_udp;
+	struct sockaddr_in addr;
 	socklen_t addr_size;
 
 	//UDP broadcast socket
@@ -1104,7 +1105,7 @@ int main(int argc, char *argv[])
 
 	while( (new_socket
 		= accept(server_fd, (struct sockaddr*)&address,
-				(socklen_t*)&addrlen))
+				(socklen_t*)&addrlen)))
 	{
 		puts("TCP connection accepted");
 		
