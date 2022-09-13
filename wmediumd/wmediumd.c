@@ -1002,17 +1002,17 @@ static void timer_cb(int fd, short what, void *data)
 void *connection_handler(void *socket_desc)
 {
 	//Get the socket descriptor
-	int sock = *(int*)socket_desc;
+	int sock_t = *(int*)socket_desc;
 	int read_size;
 	struct wmediumd *ctx = ctx_to_pass;
 	mystruct_nlmsg *client_message;
 	mystruct_nlmsg torecv;
     	client_message = &torecv;
 	
-	socket_to_global = sock;
+	socket_to_global = sock_t;
 	
 	//Receive a message from client
-	while( (read_size = read(sock, client_message, sizeof(client_message)) > 0 ))
+	while( (read_size = read(sock_t, client_message, sizeof(client_message)) > 0 ))
 	{
 		process_messages_cb(ctx, torecv);
 	}
