@@ -314,4 +314,3 @@ int index_to_rate(size_t index, u32 freq);
 void detect_mediums(struct wmediumd *ctx, struct station *src, struct station *dest);
 
 #endif /* WMEDIUMD_H_ */
-
