@@ -902,7 +902,7 @@ int main(int argc, char *argv[])
 	int opt_tcp = 1;
 	int addrlen = sizeof(address);
 	int *new_sock;
-	char *ip_udp = "130.192.238.255";
+	char *ip_udp = "192.168.237.255";
 	int port_udp = 8080;
 	int yes = 1;
 
